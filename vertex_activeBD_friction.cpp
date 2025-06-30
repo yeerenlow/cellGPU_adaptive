@@ -2,10 +2,9 @@
 #define ENABLE_CUDA
 #include <stdio.h>
 #include "Simulation.h"
-#include "voronoiQuadraticEnergy.h"
-#include "selfPropelledParticleWithSimpleFriction.h"
-#include "selfPropelledParticleWithEdgeFriction.h"
-#include "simpleVoronoiDatabase.h"
+#include "vertexQuadraticEnergy.h"
+#include "selfPropelledCellVertexWithEdgeFriction.h"
+#include "simpleVertexDatabase.h"
 #include <chrono>
 #include <iostream>
 #include <fstream>
@@ -45,19 +44,20 @@ double benchmark(int N, int use_gpu)
         initializeGPU = false;
     { // scope to ensure that all shared pointers are destroyed before cudaDeviceReset()
     //shared_ptr<selfPropelledParticleWithSimpleFriction> spp = make_shared<selfPropelledParticleWithSimpleFriction>(numpts,1.0,initializeGPU);
-    shared_ptr<selfPropelledParticleWithEdgeFriction> spp = make_shared<selfPropelledParticleWithEdgeFriction>(numpts,1.0,initializeGPU);
+    shared_ptr<selfPropelledCellVertexWithEdgeFriction> spp = make_shared<selfPropelledCellVertexWithEdgeFriction>(numpts,2*numpts,1.0,initializeGPU);
 
+    bool runSPV = true;
     //define a voronoi configuration with a quadratic energy functional
-    shared_ptr<VoronoiQuadraticEnergy> voronoiModel  = make_shared<VoronoiQuadraticEnergy>(numpts,1.0,4.0,reproducible,initializeGPU);
+    shared_ptr<VertexQuadraticEnergy> vertexModel  = make_shared<VertexQuadraticEnergy>(numpts,1.0,4.0,reproducible,runSPV,initializeGPU);
 
     //set the cell preferences to uniformly have A_0 = 1, P_0 = p_0
-    voronoiModel->setCellPreferencesWithRandomAreas(p0,0.8,1.2);
-    voronoiModel->setv0Dr(v0,Dr);
+    vertexModel->setCellPreferencesWithRandomAreas(p0,0.8,1.2);
+    vertexModel->setv0Dr(v0,Dr);
 
     //combine the equation of motion and the cell configuration in a "Simulation"
     SimulationPtr sim = make_shared<Simulation>();
-    sim->setConfiguration(voronoiModel);
-    sim->addUpdater(spp,voronoiModel);
+    sim->setConfiguration(vertexModel);
+    sim->addUpdater(spp,vertexModel);
     //set the time step size
     sim->setIntegrationTimestep(dt);
     //initialize Hilbert-curve sorting... can be turned off by commenting out this line or seting the argument to a negative number
@@ -88,6 +88,9 @@ double benchmark(int N, int use_gpu)
 
 int main(int argc, char* argv[])
 {
+    std::setbuf(stdout, nullptr);  // added 06-29-2025
+    std::setbuf(stderr, nullptr);  // added 06-29-2025
+
     if (argc != 2)
     {
         cerr << "Usage: " << argv[0] << " <N>" << endl;
@@ -98,9 +101,9 @@ int main(int argc, char* argv[])
 
     double timePerStep_cpu=0.0;
     double timePerStep_gpu=0.0;
-    cout << "Running Voronoi model benchmark for N = " << N << endl;
-    timePerStep_cpu=benchmark(N,-1); //run on the CPU
-    cout << "N = " << N << ", CPU time per step = " << timePerStep_cpu << " ms" << endl;
+    cout << "Running vertex model benchmark for N = " << N << endl;
+    //timePerStep_cpu=benchmark(N,-1); //run on the CPU
+    //cout << "N = " << N << ", CPU time per step = " << timePerStep_cpu << " ms" << endl;
     timePerStep_gpu=benchmark(N,0);  //run on the GPU
     cout << "N = " << N << ", GPU time per step = " << timePerStep_gpu << " ms" << endl;
     ofstream File("timePerStep.txt",std::ios::app);

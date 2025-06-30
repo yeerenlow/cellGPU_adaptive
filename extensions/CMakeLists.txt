@@ -3,6 +3,10 @@
 add_library(my_extensions
    updaters/selfPropelledParticleWithSimpleFriction.cpp
    updaters/selfPropelledParticleWithSimpleFriction.cu
+   updaters/selfPropelledParticleWithEdgeFriction.cpp  # added 06-28-2025
+   updaters/selfPropelledParticleWithEdgeFriction.cu  # added 06-28-2025
+   updaters/selfPropelledCellVertexWithEdgeFriction.cpp  # added 06-29-2025
+   updaters/selfPropelledCellVertexWithEdgeFriction.cu  # added 06-29-2025
 )
 
 target_include_directories(my_extensions

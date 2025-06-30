@@ -106,7 +106,6 @@ set(HEADERS
 # list the names of cpp files corresponding to linked executables you'd like...
 foreach(ARG
         voronoi_activeBD_friction
-        vertex_activeBD_friction  # added 06-29-2025
         )
 add_executable("${ARG}.out" "${ARG}.cpp" )
 target_include_directories("${ARG}.out" PUBLIC
