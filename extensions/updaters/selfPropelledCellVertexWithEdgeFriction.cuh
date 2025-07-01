@@ -5,6 +5,8 @@
 
 bool gpu_initRowPtr(int* row_ptr, int Nvertices);
 
+bool gpu_init_old_vn(int* old_vn, int Nvertices);
+
 bool gpu_spp_cellVertex_friction_eom_integration(
                             int* new_vn,
                             int* old_vn,

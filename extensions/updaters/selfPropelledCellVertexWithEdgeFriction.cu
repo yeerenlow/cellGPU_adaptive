@@ -12,6 +12,14 @@ __global__ void initRowPtr_kernel(int* row_ptr, int Nvertices)
     row_ptr[idx] = 8*idx;
     }
 
+__global__ void init_old_vn_kernel(int* old_vn, int Nvertices)
+    {
+    unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= 3*Nvertices);
+
+    old_vn[idx] = -1;
+    }
+
 __global__ void checkNeighborChange_kernel(
     int* old_vn,
     const int* __restrict__ new_vn,
@@ -163,6 +171,14 @@ bool gpu_initRowPtr(int* row_ptr, int Nvertices)
         std::cerr << "Device sync failed: " << cudaGetErrorString(err) << "\n";
         return false;
         }
+    }
+
+bool gpu_init_old_vn(int* old_vn, int Nvertices)
+    {
+    int blockSize = 128;
+    int nBlocks = (3*Nvertices + blockSize - 1) / blockSize;
+    init_old_vn_kernel<<<nBlocks,blockSize>>>(old_vn, Nvertices);
+    return true;
     }
 
 bool gpu_spp_cellVertex_friction_eom_integration(

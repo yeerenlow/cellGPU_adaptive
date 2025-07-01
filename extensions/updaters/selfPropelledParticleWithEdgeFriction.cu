@@ -2,6 +2,20 @@
 #include "curand_kernel.h"
 #include "indexer.h"
 #include "selfPropelledParticleWithEdgeFriction.cuh"
+//#include <chrono>  // added 07-01-2025
+//#include <iostream>  // added 07-01-2025
+
+__global__ void init_old_neighbors_kernel(int* old_nn, int* old_n, int N)
+    {
+    unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= N) return;
+
+    old_nn[idx] = 0;
+    for (int k = 0; k < 16; ++k)
+        {
+        old_n[16*idx+k] = -1;
+        }
+    }
 
 __global__ void checkNeighborChange_kernel(
     int* old_nn,
@@ -18,6 +32,7 @@ __global__ void checkNeighborChange_kernel(
     if (old_nn[idx] != new_nn[idx])
         {
         atomicExch(changed, 1);
+        old_nn[idx] = new_nn[idx];
         }
 
     int nn = new_nn[idx];
@@ -150,6 +165,14 @@ __global__ void spp_friction_eom_integration_kernel(
     return;
     }
 
+bool gpu_init_old_neighbors(int* old_nn, int* old_n, int N)
+    {
+    int blockSize = 256;
+    int nBlocks = (N + blockSize - 1) / blockSize;
+    init_old_neighbors_kernel<<<nBlocks,blockSize>>>(old_nn, old_n, N);
+    return true;
+    }
+
 int gpu_computeRowPtr(
     const int* d_nn,
     int N,
@@ -203,14 +226,23 @@ bool gpu_spp_friction_eom_integration(
     {
     int blockSize = 128;
     int nBlocks = (N + blockSize - 1) / blockSize;
+    //double elapsed_ms = 0.0;
     // check neighbor change
     cudaMemset(d_neigh_change, 0, sizeof(int));
+    //auto start = std::chrono::high_resolution_clock::now();
     checkNeighborChange_kernel<<<nBlocks,blockSize>>>(old_nn,old_n,new_nn,new_n,n_idx,N,d_neigh_change);
+    //auto end = std::chrono::high_resolution_clock::now();
+    //elapsed_ms = std::chrono::duration<double, std::milli>(end - start).count();
+    //cout << "checkNeighborChange_kernel took " << elapsed_ms << " ms" << endl;
     int h_neigh_change = 0;
     cudaMemcpy(&h_neigh_change, d_neigh_change, sizeof(int), cudaMemcpyDeviceToHost);
     if (h_neigh_change != 0)
         {
+        //start = std::chrono::high_resolution_clock::now();
         int nnz_check = gpu_computeRowPtr(new_nn, N, d_row_ptr, d_row_sizes);
+        //end = std::chrono::high_resolution_clock::now();
+        //elapsed_ms = std::chrono::duration<double, std::milli>(end - start).count();
+        //cout << "gpu_computeRowPtr took " << elapsed_ms << " ms" << endl;
         if (nnz_check != nnz)
             {
             cout << "nnz changes from " << nnz << " to " << nnz_check << endl;
@@ -234,6 +266,7 @@ bool gpu_spp_friction_eom_integration(
                         CUDSS_BASE_ZERO);
             }
         }
+    //start = std::chrono::high_resolution_clock::now();
     buildFrictionMatrixCSR_kernel<<<nBlocks,blockSize>>>(
         cellPositions,
         new_nn,
@@ -246,30 +279,50 @@ bool gpu_spp_friction_eom_integration(
         d_row_ptr,
         d_col_idx,
         d_values);
+    //end = std::chrono::high_resolution_clock::now();
+    //elapsed_ms = std::chrono::duration<double, std::milli>(end - start).count();
+    //cout << "buildFrictionMatrixCSR_kernel took " << elapsed_ms << " ms" << endl;
     if (h_neigh_change != 0)
         {
         // Symbolic analysis (pattern only)
+        //start = std::chrono::high_resolution_clock::now();
         cudssExecute(handle,
             CUDSS_PHASE_ANALYSIS,
             config,
             data,
             A, x, b);
+        //end = std::chrono::high_resolution_clock::now();
+        //elapsed_ms = std::chrono::duration<double, std::milli>(end - start).count();
+        //cout << "symbolic analysis took " << elapsed_ms << " ms" << endl;
         }
     // calculate the total forces vector, which automatically update b
+    //start = std::chrono::high_resolution_clock::now();
     calculateForces_kernel<<<nBlocks,blockSize>>>(forces, motility, cellDirectors, totalf_flat, N);
+    //end = std::chrono::high_resolution_clock::now();
+    //elapsed_ms = std::chrono::duration<double, std::milli>(end - start).count();
+    //cout << "calculateForces_kernel took " << elapsed_ms << " ms" << endl;
     // Numeric factorization
+    //start = std::chrono::high_resolution_clock::now();
     cudssExecute(handle,
             CUDSS_PHASE_FACTORIZATION,
             config,
             data,
             A, x, b);
+    //end = std::chrono::high_resolution_clock::now();
+    //elapsed_ms = std::chrono::duration<double, std::milli>(end - start).count();
+    //cout << "factorization took " << elapsed_ms << " ms" << endl;
     // Solve
+    //start = std::chrono::high_resolution_clock::now();
     cudssExecute(handle,
             CUDSS_PHASE_SOLVE,
             config,
             data,
             A, x, b);
+    //end = std::chrono::high_resolution_clock::now();
+    //elapsed_ms = std::chrono::duration<double, std::milli>(end - start).count();
+    //cout << "solve took " << elapsed_ms << " ms" << endl;
     // integration and update
+    //start = std::chrono::high_resolution_clock::now();
     spp_friction_eom_integration_kernel<<<nBlocks,blockSize>>>(
         displacements,
         motility,
@@ -280,5 +333,8 @@ bool gpu_spp_friction_eom_integration(
         N,
         deltaT,
         Timestep);
+    //end = std::chrono::high_resolution_clock::now();
+    //elapsed_ms = std::chrono::duration<double, std::milli>(end - start).count();
+    //cout << "spp_friction_eom_integration_kernel took " << elapsed_ms << " ms" << endl;
     return true;
     }

@@ -3,6 +3,8 @@
 
 #include "selfPropelledParticleWithEdgeFriction.h"
 
+bool gpu_init_old_neighbors(int* old_nn, int* old_n, int N);
+
 int gpu_computeRowPtr(
     const int* d_nn,
     int N,

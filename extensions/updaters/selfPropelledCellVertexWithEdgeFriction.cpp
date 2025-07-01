@@ -23,6 +23,7 @@ selfPropelledCellVertexWithEdgeFriction::selfPropelledCellVertexWithEdgeFriction
         cudaMalloc(&d_neigh_change, sizeof(int));
         //cudaMalloc(&old_nn, _N * sizeof(int));
         cudaMalloc(&old_vn, 3 * _Nvertices * sizeof(int));
+        gpu_init_old_vn(old_vn, _Nvertices);
         // create and initialize cudss structures
         cudssCreate(&handle);
         cudssConfigCreate(&config);
