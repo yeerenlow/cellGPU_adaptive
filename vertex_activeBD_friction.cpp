@@ -102,8 +102,8 @@ int main(int argc, char* argv[])
     double timePerStep_cpu=0.0;
     double timePerStep_gpu=0.0;
     cout << "Running vertex model benchmark for N = " << N << endl;
-    //timePerStep_cpu=benchmark(N,-1); //run on the CPU
-    //cout << "N = " << N << ", CPU time per step = " << timePerStep_cpu << " ms" << endl;
+    timePerStep_cpu=benchmark(N,-1); //run on the CPU
+    cout << "N = " << N << ", CPU time per step = " << timePerStep_cpu << " ms" << endl;
     timePerStep_gpu=benchmark(N,0);  //run on the GPU
     cout << "N = " << N << ", GPU time per step = " << timePerStep_gpu << " ms" << endl;
     ofstream File("timePerStep.txt",std::ios::app);

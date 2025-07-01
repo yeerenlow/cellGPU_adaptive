@@ -4,6 +4,14 @@
 #include "selfPropelledParticleWithEdgeFriction.cuh"
 #include <stdio.h>  // added 06-29-2025
 
+__global__ void initRowPtr_kernel(int* row_ptr, int Nvertices)
+    {
+    unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= 2*Nvertices+1) return;
+
+    row_ptr[idx] = 8*idx;
+    }
+
 __global__ void checkNeighborChange_kernel(
     int* old_vn,
     const int* __restrict__ new_vn,
@@ -109,8 +117,6 @@ __global__ void calculate_vertex_displacements_from_velocities_kernel(
     if (idx >= Nvertices)
         return;
 
-    printf("%f %f", velocity_flat[2*idx], velocity_flat[2*idx+1]);
-
     vertexVelocities[idx].x = velocity_flat[2*idx];
     vertexVelocities[idx].y = velocity_flat[2*idx+1];
     // update displacements
@@ -136,6 +142,28 @@ __global__ void rotate_directors_kernel(
     d_cellDirectors[idx] += cur_norm(&randState)*sqrt(2.0*deltaT*motility[idx].y);
     d_curandRNGs[idx] = randState;
     };
+
+bool gpu_initRowPtr(int* row_ptr, int Nvertices)
+    {
+    int blockSize = 128;
+    int nBlocks = (2*Nvertices) / blockSize + 1;
+    initRowPtr_kernel<<<nBlocks,blockSize>>>(row_ptr, Nvertices);
+    return true;
+
+    // added 07-01-2025
+    cudaError_t err = cudaGetLastError();
+    if (err != cudaSuccess)
+        {
+        std::cerr << "Kernel launch failed: " << cudaGetErrorString(err) << "\n";
+        return false;
+        }
+    err = cudaDeviceSynchronize();
+    if (err != cudaSuccess)
+        {
+        std::cerr << "Device sync failed: " << cudaGetErrorString(err) << "\n";
+        return false;
+        }
+    }
 
 bool gpu_spp_cellVertex_friction_eom_integration(
                             int* new_vn,
@@ -173,7 +201,6 @@ bool gpu_spp_cellVertex_friction_eom_integration(
     // check neighbor change
     cudaMemset(d_neigh_change, 0, sizeof(int));
     checkNeighborChange_kernel<<<nBlocks,blockSize>>>(old_vn,new_vn,Nvertices,d_neigh_change);
-    cout << "Done checking neighbor change" << endl;
     int h_neigh_change = 0;
     cudaMemcpy(&h_neigh_change, d_neigh_change, sizeof(int), cudaMemcpyDeviceToHost);
     buildFrictionMatrixCSR_kernel<<<nBlocks,blockSize>>>(
@@ -185,7 +212,6 @@ bool gpu_spp_cellVertex_friction_eom_integration(
         gamma_rel,
         d_col_idx,
         d_values);
-    cout << "Done building friction matrix" << endl;
     if (h_neigh_change != 0)
         {
         // Symbolic analysis (pattern only)
@@ -194,25 +220,22 @@ bool gpu_spp_cellVertex_friction_eom_integration(
             config,
             data,
             A, x, b);
-        cout << "Done with symbolic analysis" << endl;
         }
+
     // calculate the total forces vector, which automatically update b
     calculateForces_kernel<<<nBlocks,blockSize>>>(forces, motility, cellDirectors, vertexCellNeighbors, totalf_flat, Nvertices);
-    cout << "Done calculating forces" << endl;
     // Numeric factorization
     cudssExecute(handle,
             CUDSS_PHASE_FACTORIZATION,
             config,
             data,
             A, x, b);
-    cout << "Done with matrix factorization" << endl;
     // Solve
     cudssExecute(handle,
             CUDSS_PHASE_SOLVE,
             config,
             data,
             A, x, b);
-    cout << "Done with matrix solve" << endl;
     // integration and update
     calculate_vertex_displacements_from_velocities_kernel<<<nBlocks,blockSize>>>(
         displacements,
@@ -221,7 +244,6 @@ bool gpu_spp_cellVertex_friction_eom_integration(
         Nvertices,
         deltaT,
         Timestep);
-    cout << "Done calculating displacements" << endl;
     if (Ncells < 128) blockSize = 32;
     nBlocks = (Ncells + blockSize - 1) / blockSize;
     rotate_directors_kernel<<<nBlocks,blockSize>>>(
@@ -230,6 +252,6 @@ bool gpu_spp_cellVertex_friction_eom_integration(
         motility,
         deltaT,
         Ncells);
-    cout << "Done rotating directors" << endl;
+
     return true;
     }

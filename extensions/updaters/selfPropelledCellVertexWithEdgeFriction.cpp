@@ -13,10 +13,7 @@ selfPropelledCellVertexWithEdgeFriction::selfPropelledCellVertexWithEdgeFriction
         int maxRows = 2 * _Nvertices;
         // Allocate memory for the sparse matrix representation on the device
         cudaMalloc(&d_row_ptr, (maxRows + 1) * sizeof(int));
-        for (int i = 0; i < maxRows + 1; ++i)
-            {
-            cudaMemset(d_row_ptr + i, 8*i, sizeof(int));
-            }
+        gpu_initRowPtr(d_row_ptr, Nvertices);
         //cudaMemset(d_row_ptr, 0, sizeof(int));
         cudaMalloc(&d_col_idx, nnz * sizeof(int));
         cudaMalloc(&d_values, nnz * sizeof(double));
@@ -62,7 +59,6 @@ selfPropelledCellVertexWithEdgeFriction::selfPropelledCellVertexWithEdgeFriction
             CUDA_R_64F,  // value type
             CUDSS_LAYOUT_COL_MAJOR);
         //Index2D n_idx = activeModel->n_idx;
-        cout << "Done with constructor" << endl;
         }
     }
 
@@ -214,7 +210,6 @@ The GPU implementation of the self-propelled cell vertex dynamics with edge fric
 void selfPropelledCellVertexWithEdgeFriction::integrateEquationsOfMotionGPU()
     {
     activeModel->computeForces();
-    cout << "Done computing forces" << endl;
 
         {//scope for array handles
         ArrayHandle<double2> d_p(activeModel->vertexPositions,access_location::device,access_mode::read);
@@ -258,26 +253,7 @@ void selfPropelledCellVertexWithEdgeFriction::integrateEquationsOfMotionGPU()
                     b,
                     x,
                     d_neigh_change);
-        cout << "Done with EOM integration" << endl;
         }
-
-    cout << "Done with array handle scope" << endl;
-
-    /*
-    for (int i = 0; i < Nvertices; ++i)
-        {
-        cout << *(velocity_flat+2*i) << " " << *(velocity_flat+2*i+1) << endl;
-        }
-    */
-        /*
-        {
-        ArrayHandle<double2> h_disp(displacements,access_location::host,access_mode::read);
-        for (int i = 0; i < Nvertices; ++i)
-            {
-            cout << h_disp.data[i].x << " " << h_disp.data[i].y << endl;
-            }
-        }
-        */
 
     activeModel->moveDegreesOfFreedom(displacements);
     activeModel->enforceTopology();
