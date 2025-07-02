@@ -101,6 +101,7 @@ int main(int argc, char* argv[])
     cout << "Running Voronoi model benchmark for N = " << N << endl;
     timePerStep_cpu=benchmark(N,-1); //run on the CPU
     cout << "N = " << N << ", CPU time per step = " << timePerStep_cpu << " ms" << endl;
+    //cout << "With initialization" << endl;
     timePerStep_gpu=benchmark(N,0);  //run on the GPU
     cout << "N = " << N << ", GPU time per step = " << timePerStep_gpu << " ms" << endl;
     ofstream File("timePerStep.txt",std::ios::app);

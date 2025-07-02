@@ -61,6 +61,7 @@ protected:
     cudssConfig_t config;
     cudssData_t data;
     cudssMatrix_t A,b,x;
+    const int MAX_NEIGHS = 16;
 };
 
 #endif

@@ -21,7 +21,7 @@ selfPropelledParticleWithEdgeFriction::selfPropelledParticleWithEdgeFriction(int
         cudaMalloc(&d_row_sizes, maxRows * sizeof(int));
         cudaMalloc(&d_neigh_change, sizeof(int));
         cudaMalloc(&old_nn, _N * sizeof(int));
-        cudaMalloc(&old_n, 16 * _N * sizeof(int));
+        cudaMalloc(&old_n, MAX_NEIGHS * _N * sizeof(int));
         gpu_init_old_neighbors(old_nn, old_n, _N);
         // create and initialize cudss structures
         cudssCreate(&handle);

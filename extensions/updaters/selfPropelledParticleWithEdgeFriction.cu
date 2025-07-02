@@ -4,16 +4,19 @@
 #include "selfPropelledParticleWithEdgeFriction.cuh"
 //#include <chrono>  // added 07-01-2025
 //#include <iostream>  // added 07-01-2025
+#include <cassert>  // added 07-02-2025
 
 __global__ void init_old_neighbors_kernel(int* old_nn, int* old_n, int N)
     {
     unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= N) return;
 
+    const int MAX_NEIGHS = 16;
+
     old_nn[idx] = 0;
-    for (int k = 0; k < 16; ++k)
+    for (int k = 0; k < MAX_NEIGHS; ++k)
         {
-        old_n[16*idx+k] = -1;
+        old_n[MAX_NEIGHS*idx+k] = -1;
         }
     }
 
@@ -28,6 +31,10 @@ __global__ void checkNeighborChange_kernel(
     {
     unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= N) return;
+
+    const int MAX_NEIGHS = 16;
+
+    assert(new_nn[idx] <= MAX_NEIGHS);
 
     if (old_nn[idx] != new_nn[idx])
         {
@@ -170,6 +177,21 @@ bool gpu_init_old_neighbors(int* old_nn, int* old_n, int N)
     int blockSize = 256;
     int nBlocks = (N + blockSize - 1) / blockSize;
     init_old_neighbors_kernel<<<nBlocks,blockSize>>>(old_nn, old_n, N);
+
+    // added 07-01-2025
+    cudaError_t err = cudaGetLastError();
+    if (err != cudaSuccess)
+        {
+        std::cerr << "Kernel launch failed: " << cudaGetErrorString(err) << "\n";
+        return false;
+        }
+    err = cudaDeviceSynchronize();
+    if (err != cudaSuccess)
+        {
+        std::cerr << "Device sync failed: " << cudaGetErrorString(err) << "\n";
+        return false;
+        }
+
     return true;
     }
 
