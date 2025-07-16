@@ -27,7 +27,7 @@ double benchmark(int N, int use_gpu)
     int USE_GPU = use_gpu; //0 or greater uses a gpu, any negative number runs on the cpu
     int c;
     int tSteps = 10000; //number of time steps to run after initialization
-    int initSteps = 100; //number of time steps to run for initialization
+    int initSteps = 10000; //number of time steps to run for initialization  changed 100-->10000 07-14-2025
     int idx = 0;   //repeated ensemble no. 
 
     double dt = 0.01; //the time step size
@@ -43,16 +43,21 @@ double benchmark(int N, int use_gpu)
     bool gpu = chooseGPU(USE_GPU);
     if (!gpu)
         initializeGPU = false;
+    // BEGIN added 07-15-2025
+    char dataname[256];
+    sprintf(dataname,"voronoi_test.nc");
+    simpleVoronoiDatabase ncdat(numpts,dataname,fileMode::replace);
+    // END added 07-15-2025
     { // scope to ensure that all shared pointers are destroyed before cudaDeviceReset()
     //shared_ptr<selfPropelledParticleWithSimpleFriction> spp = make_shared<selfPropelledParticleWithSimpleFriction>(numpts,1.0,initializeGPU);
-    shared_ptr<selfPropelledParticleWithEdgeFriction> spp = make_shared<selfPropelledParticleWithEdgeFriction>(numpts,1.0,initializeGPU);
+    shared_ptr<selfPropelledParticleWithEdgeFriction> spp = make_shared<selfPropelledParticleWithEdgeFriction>(numpts,0.0,initializeGPU);
 
     //define a voronoi configuration with a quadratic energy functional
     shared_ptr<VoronoiQuadraticEnergy> voronoiModel  = make_shared<VoronoiQuadraticEnergy>(numpts,1.0,4.0,reproducible,initializeGPU);
 
     //set the cell preferences to uniformly have A_0 = 1, P_0 = p_0
     voronoiModel->setCellPreferencesWithRandomAreas(p0,0.8,1.2);
-    voronoiModel->setv0Dr(v0,Dr);
+    voronoiModel->setv0Dr(0.0,Dr);  // changed v0-->0.0 07-14-2025
 
     //combine the equation of motion and the cell configuration in a "Simulation"
     SimulationPtr sim = make_shared<Simulation>();
@@ -68,6 +73,17 @@ double benchmark(int N, int use_gpu)
         sim->setOmpThreads(abs(USE_GPU));
     sim->setReproducible(reproducible);
 
+    // BEGIN added 07-14-2025
+    cout << "starting initialization" << endl;
+    for (long long int ii = 0; ii < initSteps; ++ii)
+        {
+        sim->performTimestep();
+        }
+    voronoiModel->setv0Dr(v0,Dr);
+    cout << "Finished with initialization" << endl;
+    spp->setGammaRel(1.0);
+    // END added 07-14-2025
+
     //run for additional timesteps, compute dynamical features, and record timing information
     if (initializeGPU)
         cudaDeviceSynchronize();
@@ -80,6 +96,7 @@ double benchmark(int N, int use_gpu)
         cudaDeviceSynchronize();
     auto end = std::chrono::high_resolution_clock::now();
     elapsed_ms = std::chrono::duration<double, std::milli>(end - start).count();
+    ncdat.writeState(voronoiModel);  // added 07-15-2025
     }
     if(initializeGPU)
         cudaDeviceReset();
@@ -99,8 +116,8 @@ int main(int argc, char* argv[])
     double timePerStep_cpu=0.0;
     double timePerStep_gpu=0.0;
     cout << "Running Voronoi model benchmark for N = " << N << endl;
-    timePerStep_cpu=benchmark(N,-1); //run on the CPU
-    cout << "N = " << N << ", CPU time per step = " << timePerStep_cpu << " ms" << endl;
+    //timePerStep_cpu=benchmark(N,-1); //run on the CPU
+    //cout << "N = " << N << ", CPU time per step = " << timePerStep_cpu << " ms" << endl;
     //cout << "With initialization" << endl;
     timePerStep_gpu=benchmark(N,0);  //run on the GPU
     cout << "N = " << N << ", GPU time per step = " << timePerStep_gpu << " ms" << endl;

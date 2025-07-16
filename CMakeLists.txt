@@ -34,7 +34,7 @@ if(CMAKE_CUDA_COMPILER)
     enable_language(CUDA)
     include_directories(${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
     #if you have different cuda-capable hardware, modify this line to get much more optimized performance. By default,
-    set(CMAKE_CUDA_ARCHITECTURES "50")
+    set(CMAKE_CUDA_ARCHITECTURES 70 80 89 90)
     message("cuda directories ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}")
 else()
     message(STATUS "CUDA not found, building without GPU support")
@@ -106,7 +106,7 @@ set(HEADERS
 # list the names of cpp files corresponding to linked executables you'd like...
 foreach(ARG
         voronoi_activeBD_friction
-        vertex_activeBD_friction  # added 06-29-2025
+        vertex_activeBD_friction  # added 07-14-2025
         )
 add_executable("${ARG}.out" "${ARG}.cpp" )
 target_include_directories("${ARG}.out" PUBLIC

@@ -42,6 +42,11 @@ double benchmark(int N, int use_gpu)
     bool gpu = chooseGPU(USE_GPU);
     if (!gpu)
         initializeGPU = false;
+    // BEGIN added 07-15-2025
+    char dataname[256];
+    sprintf(dataname,"vertex_test.nc");
+    simpleVertexDatabase ncdat(2*numpts,dataname,fileMode::replace);
+    // END added 07-15-2025
     { // scope to ensure that all shared pointers are destroyed before cudaDeviceReset()
     //shared_ptr<selfPropelledParticleWithSimpleFriction> spp = make_shared<selfPropelledParticleWithSimpleFriction>(numpts,1.0,initializeGPU);
     shared_ptr<selfPropelledCellVertexWithEdgeFriction> spp = make_shared<selfPropelledCellVertexWithEdgeFriction>(numpts,2*numpts,1.0,initializeGPU);
@@ -53,6 +58,7 @@ double benchmark(int N, int use_gpu)
     //set the cell preferences to uniformly have A_0 = 1, P_0 = p_0
     vertexModel->setCellPreferencesWithRandomAreas(p0,0.8,1.2);
     vertexModel->setv0Dr(v0,Dr);
+    vertexModel->setT1Threshold(0.025);  // added 07-14-2025
 
     //combine the equation of motion and the cell configuration in a "Simulation"
     SimulationPtr sim = make_shared<Simulation>();
@@ -80,6 +86,7 @@ double benchmark(int N, int use_gpu)
         cudaDeviceSynchronize();
     auto end = std::chrono::high_resolution_clock::now();
     elapsed_ms = std::chrono::duration<double, std::milli>(end - start).count();
+    ncdat.writeState(vertexModel);  // added 07-15-2025
     }
     if(initializeGPU)
         cudaDeviceReset();
@@ -104,8 +111,8 @@ int main(int argc, char* argv[])
     cout << "Running vertex model benchmark for N = " << N << endl;
     timePerStep_cpu=benchmark(N,-1); //run on the CPU
     cout << "N = " << N << ", CPU time per step = " << timePerStep_cpu << " ms" << endl;
-    timePerStep_gpu=benchmark(N,0);  //run on the GPU
-    cout << "N = " << N << ", GPU time per step = " << timePerStep_gpu << " ms" << endl;
+    //timePerStep_gpu=benchmark(N,0);  //run on the GPU
+    //cout << "N = " << N << ", GPU time per step = " << timePerStep_gpu << " ms" << endl;
     ofstream File("timePerStep.txt",std::ios::app);
     if (!File.is_open())
     {

@@ -18,6 +18,10 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
       STRING "Choose the type of build." FORCE)
 endif()
 
+# Force Haswell (AVX2 + FMA) and strip out AVX-512
+set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -march=haswell -mtune=generic")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=haswell -mtune=generic")
+
 
 find_package(OpenMP REQUIRED)
 find_package(HDF5 REQUIRED)
@@ -34,7 +38,7 @@ if(CMAKE_CUDA_COMPILER)
     enable_language(CUDA)
     include_directories(${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
     #if you have different cuda-capable hardware, modify this line to get much more optimized performance. By default,
-    set(CMAKE_CUDA_ARCHITECTURES "50")
+    set(CMAKE_CUDA_ARCHITECTURES 70 80 89 90)
     message("cuda directories ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}")
 else()
     message(STATUS "CUDA not found, building without GPU support")
